@@ -1,0 +1,22 @@
+{
+  "name": "glossy-scraper",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node --loader ts-node/esm src/index.ts"
+  },
+  "ts-node": {
+    "esm": true,
+    "experimentalEsm": true
+  },
+  "dependencies": {
+    "puppeteer": "^24.32.0",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.25"
+  }
+}
