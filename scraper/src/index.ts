@@ -8,6 +8,7 @@ interface ScrapedProduct {
   store: string;
   imageUrl: string;
   category: string;
+  link: string;
 }
 
 // 2. Add Stealth Plugin to avoid detection
@@ -52,7 +53,7 @@ async function scrapePage(page: Page, url: string): Promise<ScrapedProduct[]> {
 
   // EXTRACT DATA using YesStyle's exact selectors from the DOM
   const products = await page.evaluate(() => {
-    const results: Array<{name: string; price: number; store: string; imageUrl: string; category: string}> = [];
+    const results: Array<{name: string; price: number; store: string; imageUrl: string; category: string; link: string}> = [];
     
     // Select all product containers using the exact class pattern
     const productContainers = Array.from(document.querySelectorAll('a[class*="itemContainer"]'));
@@ -75,13 +76,17 @@ async function scrapePage(page: Page, url: string): Promise<ScrapedProduct[]> {
       const imgEl = container.querySelector('img');
       const imageUrl = imgEl?.getAttribute('src') || imgEl?.getAttribute('data-src') || '';
       
-      if (name && price > 0 && imageUrl) {
+      // Get link from the anchor tag href
+      const link = (container as HTMLAnchorElement).getAttribute('href') || '';
+      
+      if (name && price > 0 && imageUrl && link) {
         results.push({
           name: name.substring(0, 200),
           price,
           store: 'YesStyle',
           imageUrl,
           category: 'Skincare',
+          link,
         });
       }
     }
