@@ -23,6 +23,7 @@ async function uploadToDB(products: ScrapedProduct[]) {
   }
   
   console.log(`📤 Uploading ${products.length} products to GLOSSY database...`);
+  console.log('📋 Sample product:', JSON.stringify(products[0], null, 2));
   try {
     const response = await fetch('http://localhost:3000/api/products', {
       method: 'POST',
@@ -30,7 +31,10 @@ async function uploadToDB(products: ScrapedProduct[]) {
       body: JSON.stringify({ products }),
     });
 
-    if (!response.ok) throw new Error(`API Status: ${response.status}`);
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`API Status: ${response.status} - ${JSON.stringify(errorData)}`);
+    }
     const result = await response.json();
     console.log('✅ Upload Success:', result);
   } catch (error) {
@@ -108,7 +112,7 @@ async function scrapeYesStyle(baseUrl: string, totalPages: number = 1): Promise<
   const allProducts: ScrapedProduct[] = [];
 
   try {
-    for (let pageNum = 1; pageNum <= 3; pageNum++) {
+    for (let pageNum = 1; pageNum <= 1; pageNum++) {
       // YesStyle pagination uses ?page=X parameter
       const pageUrl = pageNum === 1 ? baseUrl : `${baseUrl}?page=${pageNum}`;
       
