@@ -15,4 +15,6 @@ model Product {
   imageUrl  String?
   link      String?
   scrapedAt DateTime @default(now())
+
+  @@unique([name, store])
 }

@@ -1,5 +1,5 @@
 "use client";
-
+import '../app/globals.css';
 import Image from "next/image";
 import { Product } from "@prisma/client";
 
@@ -10,13 +10,6 @@ interface Props {
 export default function ProductCard({ product }: Props) {
   return (
     <div className="group">
-      
-      {/* Wishlist icon */}
-      <div className="flex justify-center mb-6 text-sm text-black">
-        ♡
-      </div>
-
-      {/* Image */}
       <div className="flex justify-center">
         {product.imageUrl ? (
           <Image
@@ -31,11 +24,21 @@ export default function ProductCard({ product }: Props) {
         )}
       </div>
 
-      {/* Info */}
-      <div className="mt-8 text-sm text-black font-satoshi">
+      <div className="mt-8 text-sm text-black">
         <p className="mb-1 text-black">New</p>
+        {product.link && (
+          <a 
+            href={`${product.link}`} 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="text-blue-500 hover:underline"
+          >
+            get the deal
+          </a>
+        )}
+        
 
-        <p className="font-500 leading-snug text-black">
+        <p className="font-500 leading-snug border-black text-black line-clamp-2">
           {product.name.replace('FLASH SALE', '').split('INR')[0].trim()}
         </p>
 
