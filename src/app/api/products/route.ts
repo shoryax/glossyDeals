@@ -39,14 +39,19 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Invalid data format" }, { status: 400 });
     }
 
+    console.log("📥 Received products:", body.products[0]); // Log first product to see structure
+    
     await prisma.product.createMany({ 
-      data: body.products, 
-      skipDuplicates: true 
+      data: body.products
     });
     
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, count: body.products.length });
   } catch (error) {
-    console.error("Database Error:", error);
-    return NextResponse.json({ error: "Failed to save products" }, { status: 500 });
+    console.error("❌ Database Error:", error);
+    console.error("Error details:", error instanceof Error ? error.message : error);
+    return NextResponse.json({ 
+      error: "Failed to save products",
+      details: error instanceof Error ? error.message : String(error)
+    }, { status: 500 });
   }
 }

@@ -1,5 +1,5 @@
 import prisma from '@/lib/prisma';
-import Header from '@/components/Header';
+// import Header from '@/components/Header';
 import ProductCard from '../components/ProductCard';
 
 export const dynamic = 'force-dynamic';
@@ -12,9 +12,8 @@ export default async function Home() {
 
   return (
     <main className="min-h-screen p-8 bg-white">
-      <Header />
       <header className="mb-8 text-center">
-        <h1 className="text-4xl font-extrabold tracking-tight text-gray-900">GLOSSY.deals</h1>
+        {/* <h1 className="text-4xl font-extrabold tracking-tight text-gray-900">GLOSSY.deals</h1> */}
         <p className="text-gray-500 mt-2">
           {products.length > 0 
             ? `Found ${products.length} active deals.` 
