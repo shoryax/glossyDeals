@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
         },
       },
       orderBy: { price: 'asc' },
-      take: 50,
+      take: 100,
     });
     return NextResponse.json(products);
   } catch (error) {
