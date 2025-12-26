@@ -1,3 +1,4 @@
+"use client";
 import puppeteerExtra from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import { Page } from 'puppeteer';
@@ -11,71 +12,9 @@ interface ScrapedProduct {
   link: string;
 }
 
-interface StoreConfig {
-  name: string;
-  baseUrl: string;
-  selectors: {
-    productContainer: string;
-    productName: string;
-    productPrice: string;
-    productImage: string;
-    productLink: string;
-  };
-  getPaginationUrl: (baseUrl: string, pageNum: number) => string;
-  priceParser: (priceText: string) => number;
-}
-
-// Store configurations
-const storeConfigs: StoreConfig[] = [
-  {
-    name: 'YesStyle',
-    baseUrl: 'https://www.yesstyle.com/en/beauty-skin-care/list.html/bcc.15544_bpt.46',
-    selectors: {
-      productContainer: 'a[class*="itemContainer"]',
-      productName: 'div[class*="itemContent"]',
-      productPrice: 'b[class*="itemPrice"]',
-      productImage: 'img',
-      productLink: 'a',
-    },
-    getPaginationUrl: (baseUrl, pageNum) => 
-      pageNum === 1 ? baseUrl : `${baseUrl}?page=${pageNum}`,
-    priceParser: (text) => parseFloat(text.replace(/[^0-9.]/g, '')) || 0,
-  },
-  {
-    name: 'Jolse',
-    baseUrl: 'https://www.jolse.com/category/skincare/1',
-    selectors: {
-      productContainer: 'div[class*="product-item"]',
-      productName: 'h2[class*="product-title"]',
-      productPrice: 'span[class*="price"]',
-      productImage: 'img[class*="product-image"]',
-      productLink: 'a[class*="product-link"]',
-    },
-    getPaginationUrl: (baseUrl, pageNum) => 
-      pageNum === 1 ? baseUrl : `${baseUrl}?p=${pageNum}`,
-    priceParser: (text) => parseFloat(text.replace(/[^0-9.]/g, '')) || 0,
-  },
-  {
-    name: 'StyleVana',
-    baseUrl: 'https://www.stylevana.com/en_US/skincare.html',
-    selectors: {
-      productContainer: 'div[class*="product-item"]',
-      productName: 'a[class*="product-title"]',
-      productPrice: 'span[class*="product-price"]',
-      productImage: 'img[class*="product-img"]',
-      productLink: 'a[class*="product-item-link"]',
-    },
-    getPaginationUrl: (baseUrl, pageNum) => 
-      pageNum === 1 ? baseUrl : `${baseUrl}?page=${pageNum}`,
-    priceParser: (text) => parseFloat(text.replace(/[^0-9.]/g, '')) || 0,
-  },
-];
-
-// 2. Add Stealth Plugin to avoid detection
 const puppeteer = puppeteerExtra.default ?? puppeteerExtra;
 puppeteer.use(StealthPlugin());
 
-// 3. The Uploader (Talks to your Next.js API)
 async function uploadToDB(products: ScrapedProduct[]) {
   if (products.length === 0) {
     console.log('⚠️ No products to upload.');
@@ -83,7 +22,6 @@ async function uploadToDB(products: ScrapedProduct[]) {
   }
   
   console.log(`📤 Uploading ${products.length} products to GLOSSY database...`);
-  console.log('📋 Sample product:', JSON.stringify(products[0], null, 2));
   try {
     const response = await fetch('http://localhost:3000/api/products', {
       method: 'POST',
@@ -93,7 +31,7 @@ async function uploadToDB(products: ScrapedProduct[]) {
 
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(`API Status: ${response.status} - ${JSON.stringify(errorData)}`);
+      throw new Error(`API Status: ${response.status}`);
     }
     const result = await response.json();
     console.log('✅ Upload Success:', result);
@@ -102,190 +40,133 @@ async function uploadToDB(products: ScrapedProduct[]) {
   }
 }
 
-// 4. The Scraper Logic - scrapes a single page for a specific store
-async function scrapePage(page: Page, url: string, storeConfig: StoreConfig): Promise<ScrapedProduct[]> {
-  console.log(`🕵️ Scraping ${storeConfig.name}: ${url}`);
+async function scrapePage(page: Page, url: string): Promise<ScrapedProduct[]> {
+  console.log(`🕵️ Scraping YesStyle: ${url}`);
   
-  await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
-  
-  // Wait for products to load
-  await page.waitForSelector(storeConfig.selectors.productContainer, { timeout: 30000 });
-  await autoScroll(page);
-  
-  // Give time for lazy-loaded images
-  await new Promise(resolve => setTimeout(resolve, 2000));
+  try {
+    await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
+    await new Promise(resolve => setTimeout(resolve, 2000));
 
-  // EXTRACT DATA using store-specific selectors
-  const products = await page.evaluate((config) => {
-    const results: Array<{name: string; price: number; store: string; imageUrl: string; category: string; link: string}> = [];
-    const debug = { foundContainers: 0, noName: 0, noPrice: 0, noImage: 0, noLink: 0, success: 0 };
-    
-    // Select all product containers
-    const productContainers = Array.from(document.querySelectorAll(config.selectors.productContainer));
-    debug.foundContainers = productContainers.length;
-    
-    for (const container of productContainers) {
-      // Get product name
-      const nameEl = container.querySelector(config.selectors.productName);
-      const name = nameEl?.textContent?.trim() || '';
+    const products = await page.evaluate(() => {
+      const results: ScrapedProduct[] = [];
+      const debug = { foundContainers: 0, success: 0, noLink: 0 };
       
-      // Skip if no name
-      if (!name || name.length < 3) {
-        debug.noName++;
-        continue;
+      // Target product containers on YesStyle
+      const productContainers = Array.from(document.querySelectorAll('a[class*="itemContainer"]'));
+      debug.foundContainers = productContainers.length;
+      
+      for (const container of productContainers) {
+        try {
+          // Container is an <a> tag, so href is the link
+          const link = (container as HTMLAnchorElement).href || '';
+          if (!link) {
+            debug.noLink++;
+            continue;
+          }
+          
+          // Get product name
+          const nameEl = container.querySelector('div[class*="itemContent"]');
+          const name = nameEl?.textContent?.trim() || '';
+          if (!name || name.length < 3) continue;
+          
+          // Get price (in INR)
+          const priceEl = container.querySelector('b[class*="itemPrice"]');
+          const priceText = priceEl?.textContent || '0';
+          const price = parseFloat(priceText.replace(/[^0-9.]/g, '')) || 0;
+          if (price <= 0) continue;
+          
+          // Get image
+          const imgEl = container.querySelector('img') as HTMLImageElement;
+          const imageUrl = imgEl?.src || imgEl?.dataset.src || '';
+          if (!imageUrl) continue;
+          
+          results.push({
+            name: name.substring(0, 200),
+            price,
+            store: 'YesStyle',
+            imageUrl,
+            category: 'Skincare',
+            link,
+          });
+          debug.success++;
+        } catch (e) {
+          // Continue on error
+        }
       }
       
-      // Get price
-      const priceEl = container.querySelector(config.selectors.productPrice);
-      const priceText = priceEl?.textContent || '0';
-      const price = parseFloat(priceText.replace(/[^0-9.]/g, '')) || 0;
-      
-      if (price === 0) {
-        debug.noPrice++;
-      }
-      
-      // Get image URL
-      const imgEl = container.querySelector(config.selectors.productImage);
-      const imageUrl = imgEl?.getAttribute('src') || imgEl?.getAttribute('data-src') || '';
-      
-      if (!imageUrl) {
-        debug.noImage++;
-      }
-      
-      // Get product link
-      let link = '';
-      const linkEl = container.querySelector(config.selectors.productLink);
-      if (linkEl) {
-        link = (linkEl as HTMLAnchorElement).getAttribute('href') || '';
-      }
-      
-      if (!link) {
-        debug.noLink++;
-      }
-      
-      // Make relative links absolute
-      if (link && !link.startsWith('http')) {
-        const baseUrl = window.location.origin;
-        link = link.startsWith('/') ? baseUrl + link : baseUrl + '/' + link;
-      }
-      
-      if (name && price > 0 && imageUrl && link) {
-        results.push({
-          name: name.substring(0, 200),
-          price,
-          store: config.name,
-          imageUrl,
-          category: 'Skincare',
-          link,
-        });
-        debug.success++;
-      }
-    }
-    
-    return { products: results, debug };
-  }, storeConfig);
+      return { products: results, debug };
+    });
 
-  console.log(`DEBUG: ${storeConfig.name}:`, products.debug);
-  const actualProducts = products.products;
-
-  console.log(`📦 Found ${actualProducts.length} items on this page.`);
-  return actualProducts;
+    console.log(`DEBUG:`, products.debug);
+    console.log(`📦 Found ${products.products.length} items`);
+    return products.products;
+    
+  } catch (error) {
+    console.error(`Error scraping:`, error);
+    return [];
+  }
 }
 
-// Scrape multiple pages from a specific store
-async function scrapeStore(storeConfig: StoreConfig, totalPages: number = 1): Promise<ScrapedProduct[]> {
-  console.log(`🚀 Starting scrape of ${storeConfig.name} (${totalPages} pages)...`);
-  const browser = await puppeteer.launch({ headless: false });
+async function scrapeYesStyle(totalPages: number = 1): Promise<ScrapedProduct[]> {
+  console.log(`\n🚀 Starting YesStyle scraper (${totalPages} pages)...`);
+  const browser = await puppeteer.launch({ 
+    headless: false,
+    args: [
+      '--disable-blink-features=AutomationControlled',
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+    ],
+  });
+  
   const page = await browser.newPage();
+  await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36');
   await page.setViewport({ width: 1366, height: 768 });
 
   const allProducts: ScrapedProduct[] = [];
+  const baseUrl = 'https://www.yesstyle.com/en/beauty-skin-care/list.html/bcc.15544_bpt.46';
 
   try {
     for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
-      const pageUrl = storeConfig.getPaginationUrl(storeConfig.baseUrl, pageNum);
+      const pageUrl = pageNum === 1 ? baseUrl : `${baseUrl}?page=${pageNum}`;
       
-      const products = await scrapePage(page, pageUrl, storeConfig);
-      allProducts.push(...products);
-      
-      console.log(`✅ Page ${pageNum}/${totalPages} done. Total products so far: ${allProducts.length}`);
-      
-      // Small delay between pages to be polite to the server
-      if (pageNum < totalPages) {
-        await new Promise(resolve => setTimeout(resolve, 2000));
+      try {
+        const products = await scrapePage(page, pageUrl);
+        allProducts.push(...products);
+        console.log(`✅ Page ${pageNum}/${totalPages} done. Total: ${allProducts.length} products`);
+        
+        if (pageNum < totalPages) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+      } catch (pageError) {
+        console.error(`Error on page ${pageNum}:`, pageError);
+        continue;
       }
     }
-
+    
     return allProducts;
-
-  } catch (error) {
-    console.error(`Scrape Error for ${storeConfig.name}:`, error);
-    return allProducts; // Return what we got so far
   } finally {
     await browser.close();
   }
 }
 
-// Helper to scroll down page (triggers lazy loading)
-async function autoScroll(page: Page) {
-  await page.evaluate(async () => {
-    await new Promise<void>((resolve) => {
-      let totalHeight = 0;
-      const distance = 100;
-      const timer = setInterval(() => {
-        const scrollHeight = document.body.scrollHeight;
-        window.scrollBy(0, distance);
-        totalHeight += distance;
-
-        if (totalHeight >= scrollHeight - window.innerHeight) {
-          clearInterval(timer);
-          resolve();
-        }
-      }, 200);
-    });
-  });
-}
-
-// 5. Main Execution - Scrape all stores
 (async () => {
-  const pagesToScrape = 1; // Start small to test, then increase
+  console.log(`\n${'='.repeat(60)}`);
+  console.log(`🚀 GLOSSY Scraper - YesStyle Only`);
+  console.log(`${'='.repeat(60)}`);
   
-  let allScrapedProducts: ScrapedProduct[] = [];
+  const pagesToScrape = 1; // Change to 2, 3, etc for more pages
   
-  // Scrape each store sequentially
-  for (const storeConfig of storeConfigs) {
-    console.log(`\n${'='.repeat(50)}`);
-    console.log(`Starting ${storeConfig.name}...`);
-    console.log(`${'='.repeat(50)}\n`);
+  try {
+    const products = await scrapeYesStyle(pagesToScrape);
     
-    try {
-      const products = await scrapeStore(storeConfig, pagesToScrape);
-      allScrapedProducts = allScrapedProducts.concat(products);
-      
-      // Delay between stores
-      await new Promise(resolve => setTimeout(resolve, 3000));
-    } catch (error) {
-      console.error(`Failed to scrape ${storeConfig.name}:`, error);
-    }
+    const cleanProducts = products.filter((p) => p.name && p.price > 0);
+    
+    console.log(`\n${'='.repeat(60)}`);
+    console.log(`📊 Summary: ${cleanProducts.length} valid products`);
+    console.log(`${'='.repeat(60)}\n`);
+    
+    await uploadToDB(cleanProducts);
+  } catch (error) {
+    console.error('❌ Fatal error:', error);
   }
-  
-  // Filter out bad data before uploading
-  const cleanProducts = allScrapedProducts.filter((p: ScrapedProduct) => p.name !== 'Unknown' && p.price > 0);
-  
-  console.log(`\n${'='.repeat(50)}`);
-  console.log(`📊 Summary: ${cleanProducts.length} valid products from ${storeConfigs.length} stores`);
-  console.log(`${'='.repeat(50)}\n`);
-  
-  // Show breakdown by store
-  const storeBreakdown = cleanProducts.reduce((acc: {[key: string]: number}, p) => {
-    acc[p.store] = (acc[p.store] || 0) + 1;
-    return acc;
-  }, {});
-  
-  console.log('Products by store:');
-  Object.entries(storeBreakdown).forEach(([store, count]) => {
-    console.log(`  ${store}: ${count}`);
-  });
-  
-  await uploadToDB(cleanProducts);
-})();
+})().catch(console.error);
