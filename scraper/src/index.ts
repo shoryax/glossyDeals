@@ -30,7 +30,6 @@ async function uploadToDB(products: ScrapedProduct[]) {
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
       throw new Error(`API Status: ${response.status}`);
     }
     const result = await response.json();
@@ -90,7 +89,8 @@ async function scrapePage(page: Page, url: string): Promise<ScrapedProduct[]> {
           });
           debug.success++;
         } catch (e) {
-          // Continue on error
+          console.log('Error parsing product:', e);
+          continue;
         }
       }
       
