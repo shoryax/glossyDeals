@@ -22,8 +22,7 @@ export default function Header({ onPriceSort }: HeaderProps) {
     <header className="border-b border-gray-200">
       {/* Top promo bar */}
       <div className="bg-[#e4e4e4] text-center py-2 text-xs tracking-wide">
-        <span className="haha text-red-600 font-medium">GET THE BEST DISCOUNTS ON SKINCARE!!!</span>
-        {/* <span className="underline cursor-pointer">NEW MEMBER EXCLUSIVE</span> */}
+        <span className="haha text-red-600 font-medium">GET THE BEST DEALS ON SKINCARE!!!</span>
       </div>
       
       {/* Main header */}

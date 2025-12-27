@@ -12,6 +12,10 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: '*.cloudfront.net',
       },
+      {
+        protocol: 'https',
+        hostname: 'via.placeholder.com',
+      },
     ],
   },
 };
