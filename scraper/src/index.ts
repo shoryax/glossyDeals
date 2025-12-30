@@ -6,6 +6,7 @@ import { Pool } from 'pg';
 import net from 'node:net';
 import { URL } from 'node:url';
 
+
 interface ScrapedProduct {
   name: string;
   price: number;
