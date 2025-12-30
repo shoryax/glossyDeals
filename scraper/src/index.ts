@@ -3,6 +3,8 @@ import puppeteerExtra from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import { Page } from 'puppeteer';
 import { Pool } from 'pg';
+import net from 'node:net';
+import { URL } from 'node:url';
 
 interface ScrapedProduct {
   name: string;
@@ -16,6 +18,30 @@ interface ScrapedProduct {
 const puppeteer = puppeteerExtra.default ?? puppeteerExtra;
 puppeteer.use(StealthPlugin());
 
+async function preflightDbTcpCheck(connectionString: string, timeoutMs: number) {
+  const url = new URL(connectionString);
+  const host = url.hostname;
+  const port = Number(url.port || '5432');
+
+  await new Promise<void>((resolve, reject) => {
+    const socket = net.connect({ host, port });
+    const timeoutId = setTimeout(() => {
+      socket.destroy(new Error(`TCP connect timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+
+    socket.once('connect', () => {
+      clearTimeout(timeoutId);
+      socket.end();
+      resolve();
+    });
+
+    socket.once('error', (err) => {
+      clearTimeout(timeoutId);
+      reject(err);
+    });
+  });
+}
+
 async function uploadToDB(products: ScrapedProduct[]) {
   if (products.length === 0) {
     console.log('⚠️ No products to upload.');
@@ -23,11 +49,33 @@ async function uploadToDB(products: ScrapedProduct[]) {
   }
   
   console.log(`📤 Uploading ${products.length} products to GLOSSY database...`);
+
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    console.error('❌ Upload Failed: DATABASE_URL is not set.');
+    return;
+  }
+
+  const dbUrl = new URL(connectionString);
+  const dbHost = dbUrl.hostname;
+  const dbPort = dbUrl.port || '5432';
+  console.log(`🔌 DB target: ${dbHost}:${dbPort}${dbUrl.pathname}`);
+
+  const connectTimeoutMs = Number(process.env.PG_CONNECT_TIMEOUT_MS || '30000');
+
+  try {
+    // Fail fast with a clearer error if the network path is blocked.
+    await preflightDbTcpCheck(connectionString, Math.min(5000, connectTimeoutMs));
+  } catch (err) {
+    console.error('❌ Cannot reach Postgres over TCP. This is usually network/permissions (RDS private subnet, security group inbound, VPN/corp firewall), not your insert loop.', err);
+    console.error('   If the DB is in a private VPC, run this scraper on an EC2/bastion in the VPC or use SSH port-forwarding and point DATABASE_URL at localhost.');
+    return;
+  }
   
   const pool = new Pool({ 
-    connectionString: process.env.DATABASE_URL,
+    connectionString,
     max: 1,
-    connectionTimeoutMillis: 30000,
+    connectionTimeoutMillis: connectTimeoutMs,
   });
   
   try {
