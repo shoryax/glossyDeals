@@ -1,7 +1,8 @@
-"use client";
+import 'dotenv/config';
 import puppeteerExtra from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import { Page } from 'puppeteer';
+import { Pool } from 'pg';
 
 interface ScrapedProduct {
   name: string;
@@ -22,20 +23,41 @@ async function uploadToDB(products: ScrapedProduct[]) {
   }
   
   console.log(`📤 Uploading ${products.length} products to GLOSSY database...`);
+  
+  const pool = new Pool({ 
+    connectionString: process.env.DATABASE_URL,
+    max: 1,
+    connectionTimeoutMillis: 30000,
+  });
+  
   try {
-    const response = await fetch('http://localhost:3000/api/products', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ products }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`API Status: ${response.status}`);
+    const client = await pool.connect();
+    
+    try {
+      let insertedCount = 0;
+      
+      for (const product of products) {
+        try {
+          await client.query(
+            `INSERT INTO "Product" (name, price, store, "imageUrl", category, link, "scrapedAt")
+             VALUES ($1, $2, $3, $4, $5, $6, NOW())
+             ON CONFLICT (name, store) DO NOTHING`,
+            [product.name, product.price, product.store, product.imageUrl, product.category, product.link]
+          );
+          insertedCount++;
+        } catch (err) {
+          console.error(`Failed to insert product: ${product.name}`, err);
+        }
+      }
+      
+      console.log(`✅ Upload Success: ${insertedCount} products saved`);
+    } finally {
+      client.release();
     }
-    const result = await response.json();
-    console.log('✅ Upload Success:', result);
   } catch (error) {
     console.error('❌ Upload Failed:', error);
+  } finally {
+    await pool.end();
   }
 }
 
