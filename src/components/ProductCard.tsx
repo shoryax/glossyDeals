@@ -1,7 +1,7 @@
 "use client";
 import '../app/globals.css';
 import Image from "next/image";
-import { Product } from "@prisma/client";
+import type { Product } from "@/types/product";
 
 interface Props {
   product: Product;

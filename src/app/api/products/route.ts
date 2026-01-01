@@ -12,7 +12,8 @@ export async function GET(request: NextRequest) {
 
   const client = await pool.connect();
   try {
-    let query = 'SELECT * FROM products WHERE 1=1';
+    // Data is stored by the scraper in the Prisma-style table "Product".
+    let query = 'SELECT * FROM "Product" WHERE 1=1';
     const params: (string | number | null)[] = [];
     let paramCount = 1;
 
