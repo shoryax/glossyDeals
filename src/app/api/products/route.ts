@@ -5,6 +5,11 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const search = searchParams.get('search') || '';
   const store = searchParams.get('store') || null;
+
+  const limitRaw = searchParams.get('limit');
+  const offsetRaw = searchParams.get('offset');
+  const limit = Math.min(200, Math.max(1, limitRaw ? Number.parseInt(limitRaw, 10) : 50));
+  const offset = Math.max(0, offsetRaw ? Number.parseInt(offsetRaw, 10) : 0);
   
   // Parse prices safely
   const minPrice = searchParams.get('minPrice') ? parseFloat(searchParams.get('minPrice')!) : null;
@@ -43,8 +48,10 @@ export async function GET(request: NextRequest) {
       params.push(maxPrice);
       paramCount++;
     }
-
-    query += ' ORDER BY price ASC LIMIT 100';
+    // Pagination for infinite scroll
+    query += ` ORDER BY price ASC LIMIT $${paramCount} OFFSET $${paramCount + 1}`;
+    params.push(limit);
+    params.push(offset);
 
     const result = await client.query(query, params);
     return NextResponse.json(result.rows);

@@ -6,11 +6,13 @@ import '@/components/product.css';
 
 interface HeaderProps {
   onPriceSort?: (sortType: 'high-to-low' | 'low-to-high' | 'none') => void;
+  onSearch?: (term: string) => void;
 }
 
-export default function Header({ onPriceSort }: HeaderProps) {
+export default function Header({ onPriceSort, onSearch }: HeaderProps) {
   const [showPriceDropdown, setShowPriceDropdown] = useState(false);
   const [selectedSort, setSelectedSort] = useState<'high-to-low' | 'low-to-high' | 'none'>('none');
+  const [searchTerm, setSearchTerm] = useState('');
   
   const handlePriceSort = (sortType: 'high-to-low' | 'low-to-high' | 'none') => {
     setSelectedSort(sortType);
@@ -26,15 +28,42 @@ export default function Header({ onPriceSort }: HeaderProps) {
       </div>
       
       {/* Main header */}
-      <div className="max-w-[1400px] mx-auto px-4 py-3 flex items-center justify-between">
+      <div className="max-w-[1400px] mx-auto px-4 py-3 flex items-center gap-6">
         {/* Logo */}
-        <div className="flex items-center gap-8">
+        <div className="flex items-center gap-8 shrink-0">
           <h1 className="text-gray-500 font-bold text-3xl tracking-light">Glossy Deals</h1>
         
         </div>
+
+        {/* Search (right-of-center) */}
+        <div className="flex-1 flex justify-end">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              onSearch?.(searchTerm.trim());
+            }}
+            className="w-full max-w-xl"
+          >
+            <div className="flex items-center gap-2 border border-gray-300 rounded px-3 py-2">
+              <Search className="w-4 h-4 text-gray-500" strokeWidth={2} />
+              <input
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search products"
+                className="w-full bg-transparent text-sm text-gray-700 outline-none"
+              />
+              <button
+                type="submit"
+                className="text-sm font-medium text-gray-700"
+              >
+                Search
+              </button>
+            </div>
+          </form>
+        </div>
         
         {/* Icons and Filter */}
-        <div className="flex items-center gap-5">
+        <div className="flex items-center gap-5 shrink-0">
           <div className="relative">
             <button
               onClick={() => setShowPriceDropdown(!showPriceDropdown)}
@@ -73,10 +102,6 @@ export default function Header({ onPriceSort }: HeaderProps) {
               </div>
             )}
           </div>
-          
-          <button className="hover:opacity-100 transition-opacity text-gray-500">
-            <Search className="w-5 h-5" strokeWidth={2} />
-          </button>
 
           <button className="hover:opacity-100 transition-opacity text-gray-500">
             <Heart className="w-5 h-5" strokeWidth={2} />
