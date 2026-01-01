@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Header from '@/components/Header';
 import ProductCard from '../components/ProductCard';
-import { Product } from '@prisma/client';
+import type { Product } from '@/types/product';
 
 export default function Home() {
   const [products, setProducts] = useState<Product[]>([]);

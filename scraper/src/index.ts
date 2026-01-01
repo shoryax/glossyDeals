@@ -77,6 +77,7 @@ async function uploadToDB(products: ScrapedProduct[]) {
     connectionString,
     max: 1,
     connectionTimeoutMillis: connectTimeoutMs,
+    ssl: { rejectUnauthorized: false },
   });
   
   try {
@@ -181,7 +182,7 @@ async function scrapePage(page: Page, url: string): Promise<ScrapedProduct[]> {
 async function scrapeYesStyle(totalPages: number = 1): Promise<ScrapedProduct[]> {
   console.log(`\n🚀 Starting YesStyle scraper (${totalPages} pages)...`);
   const browser = await puppeteer.launch({ 
-    headless: false,
+    headless: true,
     args: [
       '--disable-blink-features=AutomationControlled',
       '--no-sandbox',
