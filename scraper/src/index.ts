@@ -85,22 +85,31 @@ async function uploadToDB(products: ScrapedProduct[]) {
     
     try {
       let insertedCount = 0;
+      let skippedCount = 0;
+      let failedCount = 0;
       
       for (const product of products) {
         try {
-          await client.query(
+          const result = await client.query(
             `INSERT INTO "Product" (name, price, store, "imageUrl", category, link, "scrapedAt")
              VALUES ($1, $2, $3, $4, $5, $6, NOW())
              ON CONFLICT (name, store) DO NOTHING`,
             [product.name, product.price, product.store, product.imageUrl, product.category, product.link]
           );
-          insertedCount++;
+          if (result.rowCount === 1) {
+            insertedCount++;
+          } else {
+            skippedCount++;
+          }
         } catch (err) {
+          failedCount++;
           console.error(`Failed to insert product: ${product.name}`, err);
         }
       }
       
-      console.log(`✅ Upload Success: ${insertedCount} products saved`);
+      console.log(
+        `✅ Upload Summary: inserted=${insertedCount}, skipped(existing)=${skippedCount}, failed=${failedCount}, total=${products.length}`
+      );
     } finally {
       client.release();
     }
@@ -179,7 +188,7 @@ async function scrapePage(page: Page, url: string): Promise<ScrapedProduct[]> {
   }
 }
 
-async function scrapeYesStyle(totalPages: number = 1): Promise<ScrapedProduct[]> {
+async function scrapeYesStyle(totalPages: number = 4): Promise<ScrapedProduct[]> {
   console.log(`\n🚀 Starting YesStyle scraper (${totalPages} pages)...`);
   const browser = await puppeteer.launch({ 
     headless: true,
@@ -199,7 +208,8 @@ async function scrapeYesStyle(totalPages: number = 1): Promise<ScrapedProduct[]>
 
   try {
     for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
-      const pageUrl = pageNum === 1 ? baseUrl : `${baseUrl}?page=${pageNum}`;
+      // YesStyle uses `pn` for pagination (pn=2, pn=3, ...)
+      const pageUrl = pageNum === 1 ? baseUrl : `${baseUrl}?pn=${pageNum}`;
       
       try {
         const products = await scrapePage(page, pageUrl);
@@ -226,7 +236,7 @@ async function scrapeYesStyle(totalPages: number = 1): Promise<ScrapedProduct[]>
   console.log(`🚀 GLOSSY Scraper - YesStyle Only`);
   console.log(`${'='.repeat(60)}`);
   
-  const pagesToScrape = 1; // Change to 2, 3, etc for more pages
+  const pagesToScrape = Math.max(1, Number.parseInt(process.env.PAGES_TO_SCRAPE || '4', 10) || 4);
   
   try {
     const products = await scrapeYesStyle(pagesToScrape);
