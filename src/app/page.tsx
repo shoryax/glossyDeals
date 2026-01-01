@@ -49,7 +49,11 @@ export default function Home() {
       if (mode === 'replace') {
         setProducts(data);
       } else {
-        setProducts((prev) => [...prev, ...data]);
+        setProducts((prev) => {
+          const seen = new Set(prev.map((p) => p.id));
+          const uniqueNext = data.filter((p) => !seen.has(p.id));
+          return [...prev, ...uniqueNext];
+        });
       }
 
       setOffset(nextOffset + data.length);

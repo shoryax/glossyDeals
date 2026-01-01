@@ -49,7 +49,8 @@ export async function GET(request: NextRequest) {
       paramCount++;
     }
     // Pagination for infinite scroll
-    query += ` ORDER BY price ASC LIMIT $${paramCount} OFFSET $${paramCount + 1}`;
+    // Add a tie-breaker (id) so LIMIT/OFFSET pagination is stable.
+    query += ` ORDER BY price ASC, id ASC LIMIT $${paramCount} OFFSET $${paramCount + 1}`;
     params.push(limit);
     params.push(offset);
 
