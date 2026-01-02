@@ -30,10 +30,8 @@
     ".next/types/**/*.ts",
     "src/**/*.ts",
     "src/**/*.d.ts",
-    "scraper/src/**/*.ts",       
-    "scraper/src/**/*.d.ts",    
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "scraper"]
 }

@@ -1,18 +1,20 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Search, Heart, ChevronDown } from 'lucide-react';
+import { useState } from 'react';
+import { Heart, ChevronDown } from 'lucide-react';
 import '@/components/product.css';
+import SearchBar from '@/components/SearchBar';
+import StoreSortButton, { type StoreFilterType } from '@/components/StoreSortButton';
 
 interface HeaderProps {
   onPriceSort?: (sortType: 'high-to-low' | 'low-to-high' | 'none') => void;
+  onStoreFilter?: (store: StoreFilterType) => void;
   onSearch?: (term: string) => void;
 }
 
-export default function Header({ onPriceSort, onSearch }: HeaderProps) {
+export default function Header({ onPriceSort, onStoreFilter, onSearch }: HeaderProps) {
   const [showPriceDropdown, setShowPriceDropdown] = useState(false);
   const [selectedSort, setSelectedSort] = useState<'high-to-low' | 'low-to-high' | 'none'>('none');
-  const [searchTerm, setSearchTerm] = useState('');
   
   const handlePriceSort = (sortType: 'high-to-low' | 'low-to-high' | 'none') => {
     setSelectedSort(sortType);
@@ -37,29 +39,7 @@ export default function Header({ onPriceSort, onSearch }: HeaderProps) {
 
         {/* Search (right-of-center) */}
         <div className="flex-1 flex justify-end">
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              onSearch?.(searchTerm.trim());
-            }}
-            className="w-full max-w-xl"
-          >
-            <div className="flex items-center gap-2 border border-gray-300 rounded px-3 py-2">
-              <Search className="w-4 h-4 text-gray-500" strokeWidth={2} />
-              <input
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search products"
-                className="w-full bg-transparent text-sm text-gray-700 outline-none"
-              />
-              <button
-                type="submit"
-                className="text-sm font-medium text-gray-700"
-              >
-                Search
-              </button>
-            </div>
-          </form>
+          <SearchBar onSearch={onSearch} />
         </div>
         
         {/* Icons and Filter */}
@@ -102,6 +82,8 @@ export default function Header({ onPriceSort, onSearch }: HeaderProps) {
               </div>
             )}
           </div>
+
+          <StoreSortButton onStoreFilter={onStoreFilter} />
 
           <button className="hover:opacity-100 transition-opacity text-gray-500">
             <Heart className="w-5 h-5" strokeWidth={2} />
