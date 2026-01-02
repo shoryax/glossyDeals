@@ -188,6 +188,84 @@ async function scrapePage(page: Page, url: string): Promise<ScrapedProduct[]> {
   }
 }
 
+async function scrapeChicorPage(page: Page, url: string): Promise<ScrapedProduct[]> {
+  console.log(`🕵️ Scraping Chicor: ${url}`);
+
+  try {
+    await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+
+    const products = await page.evaluate(() => {
+      const results: ScrapedProduct[] = [];
+      const debug = { foundContainers: 0, success: 0, noLink: 0 };
+
+      const containers = Array.from(document.querySelectorAll('.goods-item')) as HTMLElement[];
+      debug.foundContainers = containers.length;
+
+      for (const container of containers) {
+        try {
+          const nameEl = container.querySelector('.info a.name') as HTMLAnchorElement | null;
+          const brandEl = container.querySelector('.info .brand') as HTMLElement | null;
+          const priceEl = container.querySelector('.info .price') as HTMLElement | null;
+          const imgEl = container.querySelector('.thumbnail img') as HTMLImageElement | null;
+
+          const rawName = (nameEl?.textContent || '').trim();
+          const rawBrand = (brandEl?.textContent || '').trim();
+          const combinedName = `${rawBrand ? `${rawBrand} ` : ''}${rawName}`.trim();
+          if (!combinedName || combinedName.length < 3) continue;
+
+          const priceText = (priceEl?.textContent || '').trim();
+          const price = Number.parseFloat(priceText.replace(/[^0-9.]/g, '')) || 0;
+          if (price <= 0) continue;
+
+          const imageUrl = imgEl?.src || imgEl?.getAttribute('src') || '';
+          if (!imageUrl) continue;
+
+          const href = nameEl?.getAttribute('href') || '';
+          const match = href.match(/fnGoGoosDtl\('([^']+)'\s*,\s*'([^']*)'\)/);
+          if (!match) {
+            debug.noLink++;
+            continue;
+          }
+
+          const goodsCode = match[1] || '';
+          const dscatNo = match[2] || '0';
+          if (!goodsCode) {
+            debug.noLink++;
+            continue;
+          }
+
+          const link = new URL(
+            `/goods/${goodsCode}?dscatNo=${encodeURIComponent(dscatNo)}&pageType=new`,
+            location.origin
+          ).toString();
+
+          results.push({
+            name: combinedName.substring(0, 200),
+            price,
+            store: 'Chicor',
+            imageUrl,
+            category: 'Skincare',
+            link,
+          });
+          debug.success++;
+        } catch {
+          continue;
+        }
+      }
+
+      return { products: results, debug };
+    });
+
+    console.log(`DEBUG:`, products.debug);
+    console.log(`📦 Found ${products.products.length} items`);
+    return products.products;
+  } catch (error) {
+    console.error(`Error scraping:`, error);
+    return [];
+  }
+}
+
 async function scrapeYesStyle(totalPages: number = 4): Promise<ScrapedProduct[]> {
   console.log(`\n🚀 Starting YesStyle scraper (${totalPages} pages)...`);
   const browser = await puppeteer.launch({ 
@@ -202,17 +280,56 @@ async function scrapeYesStyle(totalPages: number = 4): Promise<ScrapedProduct[]>
   const page = await browser.newPage();
   await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36');
   await page.setViewport({ width: 1366, height: 768 });
-
   const allProducts: ScrapedProduct[] = [];
   const baseUrl = 'https://www.yesstyle.com/en/beauty-skin-care/list.html/bcc.15544_bpt.46';
 
   try {
     for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
-      // YesStyle uses `pn` for pagination (pn=2, pn=3, ...)
       const pageUrl = pageNum === 1 ? baseUrl : `${baseUrl}?pn=${pageNum}`;
       
       try {
         const products = await scrapePage(page, pageUrl);
+        allProducts.push(...products);
+        console.log(`✅ Page ${pageNum}/${totalPages} done. Total: ${allProducts.length} products`);
+        
+        if (pageNum < totalPages) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+      } catch (pageError) {
+        console.error(`Error on page ${pageNum}:`, pageError);
+        continue;
+      }
+    }
+    return allProducts;
+  } finally {
+    await browser.close();
+  }
+}
+
+async function scrapeChicor(totalPages: number = 1): Promise<ScrapedProduct[]> {
+  console.log(`\n🚀 Starting Chicor scraper (${totalPages} pages)...`);
+  const browser = await puppeteer.launch({ 
+    headless: true,
+    args: [
+      '--disable-blink-features=AutomationControlled',
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+    ],
+  });
+  
+  const page = await browser.newPage();
+  await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36');
+  await page.setViewport({ width: 1366, height: 768 });
+
+  const allProducts: ScrapedProduct[] = [];
+  const baseUrl = 'https://chicor.com/goods?dscatNo=1&hrchyLv=1';
+
+  try {
+    for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+      const pageUrl = baseUrl;
+      try {
+        if (pageNum > 1) break;
+        const products = await scrapeChicorPage(page, pageUrl);
         allProducts.push(...products);
         console.log(`✅ Page ${pageNum}/${totalPages} done. Total: ${allProducts.length} products`);
         
@@ -233,13 +350,15 @@ async function scrapeYesStyle(totalPages: number = 4): Promise<ScrapedProduct[]>
 
 (async () => {
   console.log(`\n${'='.repeat(60)}`);
-  console.log(`🚀 GLOSSY Scraper - YesStyle Only`);
+  console.log(`🚀 GLOSSY Scraper - Multi-store`);
   console.log(`${'='.repeat(60)}`);
   
   const pagesToScrape = Math.max(1, Number.parseInt(process.env.PAGES_TO_SCRAPE || '4', 10) || 4);
   
   try {
-    const products = await scrapeYesStyle(pagesToScrape);
+    const yesStyleProducts = await scrapeYesStyle(pagesToScrape);
+    const chicorProducts = await scrapeChicor(1);
+    const products = [...yesStyleProducts, ...chicorProducts];
     
     const cleanProducts = products.filter((p) => p.name && p.price > 0);
     

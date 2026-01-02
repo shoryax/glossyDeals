@@ -25,7 +25,14 @@ export default function ProductCard({ product }: Props) {
       </div>
 
       <div className="mt-8 text-sm text-black">
-        <p className="mb-1 text-black">New</p>
+        <div className="mb-1 flex items-center justify-between">
+          <p className="text-black">New</p>
+          {(product.store || product.link || product.url) && (
+            <p className="text-xs text-gray-500">
+              {product.store || ''}
+            </p>
+          )}
+        </div>
         {product.link && (
           <a 
             href={`${product.link}`} 
