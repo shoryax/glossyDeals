@@ -4,6 +4,9 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Glossy Deals",
   description: "Get the best deals on skincare products!!",
+  icons: {
+    icon: "/icon.png",
+  },
 };
 
 export default function RootLayout({
