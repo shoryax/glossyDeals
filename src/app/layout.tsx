@@ -5,7 +5,7 @@ export const metadata: Metadata = {
   title: "Glossy Deals",
   description: "Get the best deals on skincare products!!",
   icons: {
-    icon: "/icon.png",
+    icon: "/icon.jpg",
   },
 };
 
