@@ -288,7 +288,7 @@ export default function Home() {
           {/* Mobile Filters - Shown only on mobile */}
           <div className="lg:hidden space-y-4">
             <details className="glass-morphism border border-gray-200 rounded-2xl overflow-hidden">
-              <summary className="px-4 py-3 font-semibold text-gray-900 cursor-pointer hover:bg-gray-50 smooth-transition">
+              <summary className="px-4 py-3 font-semibold text-gray-900 cursor-pointer  smooth-transition">
                 💰 Price Range
               </summary>
               <div className="px-4 pb-4 pt-2 space-y-3">
