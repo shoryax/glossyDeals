@@ -51,7 +51,7 @@ export default function ProductCard({ product }: Props) {
 
         {product.price && (
           <p className="mt-1 text-black font-500">
-            ₹{product.price.toLocaleString("en-IN")}
+            {product.store?.toLowerCase() === "chicor" ? "₩" : "₹"}{product.price.toLocaleString(product.store?.toLowerCase() === "chicor" ? "ko-KR" : "en-IN")}
           </p>
         )}
       </div>
