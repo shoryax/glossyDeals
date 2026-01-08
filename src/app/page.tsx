@@ -204,7 +204,7 @@ export default function Home() {
 
         <div className="flex gap-10">
           {/* Left section – 25% */}
-          <div className="w-[25%] p-4 border border-gray-200 min-h-screen">
+          <div className="w-[25%] p-4 border border-gray-200 h-[500px] rounded-lg sticky top-20 overflow-y-auto">
             <div className="p-5 border border-gray-200 space-y-3">
               <p className="font-semibold text-gray-800">Price range</p>
               <div className="flex items-center gap-2">
