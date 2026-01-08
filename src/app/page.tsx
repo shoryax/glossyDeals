@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Header from '@/components/Header';
+import PriceRangeFilter from '@/components/PriceRangeFilter';
+import BrandFilter from '@/components/BrandFilter';
+import MobileFilters from '@/components/MobileFilters';
 import ProductCard from '../components/ProductCard';
 import type { Product } from '@/types/product';
 import type { StoreFilterType } from '@/components/StoreSortButton';
@@ -207,160 +210,32 @@ export default function Home() {
         </header>
 
         <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
-          {/* Filters Sidebar - Hidden on mobile, shown on large screens */}
           <aside className="hidden lg:block lg:w-80 shrink-0">
             <div className="sticky top-24 space-y-4">
-              {/* Price Range Filter */}
-              <div className="glass-morphism border border-gray-200 rounded-2xl p-5 sm:p-6 space-y-4">
-                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                  💰 Price Range
-                </h3>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    className="w-full rounded-xl border-2 border-gray-200 px-3 py-2.5 text-sm focus:border-fuchsia-400 focus:outline-none smooth-transition"
-                    placeholder="Min"
-                    value={priceRange.min}
-                    onChange={(e) => setPriceRange((prev) => ({ ...prev, min: e.target.value }))}
-                  />
-                  <span className="text-gray-400 font-medium">—</span>
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    className="w-full rounded-xl border-2 border-gray-200 px-3 py-2.5 text-sm focus:border-fuchsia-400 focus:outline-none smooth-transition"
-                    placeholder="Max"
-                    value={priceRange.max}
-                    onChange={(e) => setPriceRange((prev) => ({ ...prev, max: e.target.value }))}
-                  />
-                </div>
-                <button
-                  type="button"
-                  className="w-full rounded-xl bg-gradient-to-r from-fuchsia-600 to-purple-600 text-white py-3 text-sm font-semibold hover:from-fuchsia-700 hover:to-purple-700 smooth-transition shadow-md hover:shadow-lg"
-                  onClick={applyPriceFilter}
-                >
-                  Apply Filter
-                </button>
-              </div>
+              <PriceRangeFilter 
+                priceRange={priceRange}
+                onPriceChange={setPriceRange}
+                onApply={applyPriceFilter}
+              />
 
               {/* Brand Filter */}
-              <div className="glass-morphism border border-gray-200 rounded-2xl p-5 sm:p-6 space-y-4 max-h-[500px] overflow-y-auto">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                    ✨ Brands
-                  </h3>
-                  {selectedBrand && (
-                    <button
-                      type="button"
-                      className="text-xs text-fuchsia-600 hover:text-fuchsia-700 font-semibold"
-                      onClick={() => setSelectedBrand(null)}
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
-                <div className="flex flex-col gap-2">
-                  {brands.map((brand) => {
-                    const isActive = selectedBrand?.toLowerCase() === brand.toLowerCase();
-                    return (
-                      <button
-                        key={brand}
-                        type="button"
-                        className={`text-left rounded-xl border-2 px-4 py-3 text-sm font-medium smooth-transition ${
-                          isActive
-                            ? 'border-fuchsia-500 bg-gradient-to-r from-fuchsia-50 to-purple-50 text-fuchsia-700 shadow-md'
-                            : 'border-gray-200 hover:border-fuchsia-200 hover:bg-gray-50'
-                        }`}
-                        onClick={() => setSelectedBrand(brand)}
-                      >
-                        {brand}
-                      </button>
-                    );
-                  })}
-                  {brands.length === 0 && (
-                    <p className="text-xs text-gray-500 text-center py-4">Brands will appear as products load</p>
-                  )}
-                </div>
-              </div>
+              <BrandFilter 
+                brands={brands}
+                selectedBrand={selectedBrand}
+                onBrandSelect={setSelectedBrand}
+              />
             </div>
           </aside>
 
           {/* Mobile Filters - Shown only on mobile */}
-          <div className="lg:hidden space-y-4">
-            <details className="glass-morphism border border-gray-200 rounded-2xl overflow-hidden">
-              <summary className="px-4 py-3 font-semibold text-gray-900 cursor-pointer  smooth-transition">
-                💰 Price Range
-              </summary>
-              <div className="px-4 pb-4 pt-2 space-y-3">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    className="w-full rounded-xl border-2 border-gray-200 px-3 py-2 text-sm focus:border-fuchsia-400 focus:outline-none"
-                    placeholder="Min"
-                    value={priceRange.min}
-                    onChange={(e) => setPriceRange((prev) => ({ ...prev, min: e.target.value }))}
-                  />
-                  <span className="text-gray-400">—</span>
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    className="w-full rounded-xl border-2 border-gray-200 px-3 py-2 text-sm focus:border-fuchsia-400 focus:outline-none"
-                    placeholder="Max"
-                    value={priceRange.max}
-                    onChange={(e) => setPriceRange((prev) => ({ ...prev, max: e.target.value }))}
-                  />
-                </div>
-                <button
-                  type="button"
-                  className="w-full rounded-xl bg-gradient-to-r from-fuchsia-600 to-purple-600 text-white py-2.5 text-sm font-semibold"
-                  onClick={applyPriceFilter}
-                >
-                  Apply Filter
-                </button>
-              </div>
-            </details>
-
-            <details className="glass-morphism border border-gray-200 rounded-2xl overflow-hidden">
-              <summary className="px-4 py-3 font-semibold text-gray-900 cursor-pointer hover:bg-gray-50 smooth-transition flex items-center justify-between">
-                <span>✨ Brands</span>
-                {selectedBrand && (
-                  <button
-                    type="button"
-                    className="text-xs text-fuchsia-600 font-semibold"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setSelectedBrand(null);
-                    }}
-                  >
-                    Clear
-                  </button>
-                )}
-              </summary>
-              <div className="px-4 pb-4 pt-2 max-h-60 overflow-y-auto space-y-2">
-                {brands.map((brand) => {
-                  const isActive = selectedBrand?.toLowerCase() === brand.toLowerCase();
-                  return (
-                    <button
-                      key={brand}
-                      type="button"
-                      className={`w-full text-left rounded-xl border-2 px-3 py-2 text-sm font-medium smooth-transition ${
-                        isActive
-                          ? 'border-fuchsia-500 bg-gradient-to-r from-fuchsia-50 to-purple-50 text-fuchsia-700'
-                          : 'border-gray-200 hover:border-fuchsia-200'
-                      }`}
-                      onClick={() => setSelectedBrand(brand)}
-                    >
-                      {brand}
-                    </button>
-                  );
-                })}
-                {brands.length === 0 && (
-                  <p className="text-xs text-gray-500 text-center py-2">No brands available</p>
-                )}
-              </div>
-            </details>
-          </div>
+          <MobileFilters 
+            priceRange={priceRange}
+            onPriceChange={setPriceRange}
+            onApplyPrice={applyPriceFilter}
+            brands={brands}
+            selectedBrand={selectedBrand}
+            onBrandSelect={setSelectedBrand}
+          />
 
           {/* Products Grid */}
           <div className="flex-1 min-w-0">
