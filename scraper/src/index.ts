@@ -43,13 +43,13 @@ async function preflightDbTcpCheck(connectionString: string, timeoutMs: number) 
   });
 }
 
-async function uploadToDB(products: ScrapedProduct[]) {
-  if (products.length === 0) {
+async function uploadToDB(productsArray: ScrapedProduct[]) {
+  if (productsArray.length === 0) {
     console.log('⚠️ No products to upload.');
     return;
   }
-  
-  console.log(`📤 Uploading ${products.length} products to GLOSSY database...`);
+
+  console.log(`Uploading ${productsArray.length} products to the database...`);
 
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
@@ -69,26 +69,26 @@ async function uploadToDB(products: ScrapedProduct[]) {
     await preflightDbTcpCheck(connectionString, Math.min(5000, connectTimeoutMs));
   } catch (err) {
     console.error('❌ Cannot reach Postgres over TCP. This is usually network/permissions (RDS private subnet, security group inbound, VPN/corp firewall), not your insert loop.', err);
-    console.error('   If the DB is in a private VPC, run this scraper on an EC2/bastion in the VPC or use SSH port-forwarding and point DATABASE_URL at localhost.');
+    console.error('If the DB is in a private VPC, run this scraper on an EC2/bastion in the VPC or use SSH port-forwarding and point DATABASE_URL at localhost.');
     return;
   }
-  
-  const pool = new Pool({ 
+
+  const pool = new Pool({
     connectionString,
     max: 1,
     connectionTimeoutMillis: connectTimeoutMs,
     ssl: { rejectUnauthorized: false },
   });
-  
+
   try {
     const client = await pool.connect();
-    
+
     try {
       let insertedCount = 0;
       let skippedCount = 0;
       let failedCount = 0;
-      
-      for (const product of products) {
+
+      for (const product of productsArray) {
         try {
           const result = await client.query(
             `INSERT INTO "Product" (name, price, store, "imageUrl", category, link, "scrapedAt")
@@ -106,9 +106,9 @@ async function uploadToDB(products: ScrapedProduct[]) {
           console.error(`Failed to insert product: ${product.name}`, err);
         }
       }
-      
+
       console.log(
-        `✅ Upload Summary: inserted=${insertedCount}, skipped(existing)=${skippedCount}, failed=${failedCount}, total=${products.length}`
+        `✅ Upload Summary: inserted=${insertedCount}, skipped(existing)=${skippedCount}, failed=${failedCount}, total=${productsArray.length}`
       );
     } finally {
       client.release();
@@ -122,44 +122,43 @@ async function uploadToDB(products: ScrapedProduct[]) {
 
 async function scrapePage(page: Page, url: string): Promise<ScrapedProduct[]> {
   console.log(`🕵️ Scraping YesStyle: ${url}`);
-  
+
   try {
     await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
     await new Promise(resolve => setTimeout(resolve, 2000));
 
-    const products = await page.evaluate(() => {
+    const pageResult = await page.evaluate(() => {
       const results: ScrapedProduct[] = [];
       const debug = { foundContainers: 0, success: 0, noLink: 0 };
-      
+
       // Target product containers on YesStyle
       const productContainers = Array.from(document.querySelectorAll('a[class*="itemContainer"]'));
       debug.foundContainers = productContainers.length;
-      
+
       for (const container of productContainers) {
         try {
-          // Container is an <a> tag, so href is the link
           const link = (container as HTMLAnchorElement).href || '';
           if (!link) {
             debug.noLink++;
             continue;
           }
-          
+
           // Get product name
           const nameEl = container.querySelector('div[class*="itemContent"]');
           const name = nameEl?.textContent?.trim() || '';
           if (!name || name.length < 3) continue;
-          
+
           // Get price (in INR)
           const priceEl = container.querySelector('b[class*="itemPrice"]');
           const priceText = priceEl?.textContent || '0';
           const price = parseFloat(priceText.replace(/[^0-9.]/g, '')) || 0;
           if (price <= 0) continue;
-          
+
           // Get image
           const imgEl = container.querySelector('img') as HTMLImageElement;
           const imageUrl = imgEl?.src || imgEl?.dataset.src || '';
           if (!imageUrl) continue;
-          
+
           results.push({
             name: name.substring(0, 200),
             price,
@@ -174,28 +173,92 @@ async function scrapePage(page: Page, url: string): Promise<ScrapedProduct[]> {
           continue;
         }
       }
-      
+
       return { products: results, debug };
     });
 
-    console.log(`DEBUG:`, products.debug);
-    console.log(`📦 Found ${products.products.length} items`);
-    return products.products;
-    
+    console.log(`DEBUG:`, pageResult.debug);
+    console.log(`📦 Found ${pageResult.products.length} items`);
+    return pageResult.products;
+
   } catch (error) {
     console.error(`Error scraping:`, error);
     return [];
   }
 }
 
-async function scrapeChicorPage(page: Page, url: string): Promise<ScrapedProduct[]> {
-  console.log(`🕵️ Scraping Chicor: ${url}`);
+async function scrapeYesStyle(totalPages: number = 4): Promise<ScrapedProduct[]> {
+  console.log(`\n🚀 Starting YesStyle scraper (${totalPages} pages)...`);
+  const browser = await puppeteer.launch({
+    headless: true,
+    args: [
+      '--disable-blink-features=AutomationControlled',
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+    ],
+  });
+
+  const page = await browser.newPage();
+  await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36');
+  await page.setViewport({ width: 1366, height: 768 });
+  const allProducts: ScrapedProduct[] = [];
+  const baseUrl = 'https://www.yesstyle.com/en/beauty-skin-care/list.html/bcc.15544_bpt.46';
 
   try {
-    await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
+    for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+      const pageUrl = pageNum === 1 ? baseUrl : `${baseUrl}?pn=${pageNum}`;
+
+      try {
+        const pageProducts = await scrapePage(page, pageUrl);
+        allProducts.push(...pageProducts);
+        console.log(`✅ Page ${pageNum}/${totalPages} done. Total: ${allProducts.length} products`);
+
+        if (pageNum < totalPages) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+      } catch (pageError) {
+        console.error(`Error on page ${pageNum}:`, pageError);
+        continue;
+      }
+    }
+    return allProducts;
+  } finally {
+    await browser.close();
+  }
+}
+
+async function scrapeChicor(totalPages: number = 1): Promise<ScrapedProduct[]> {
+  const effectivePages = Math.max(1, totalPages);
+  if (effectivePages > 1) {
+    console.log(`\n🚀 Starting Chicor scraper (${effectivePages} pages requested)...`);
+    console.log('ℹ️ Chicor pagination is not implemented; scraping the first page only.');
+  } else {
+    console.log(`\n🚀 Starting Chicor scraper (${effectivePages} pages)...`);
+  }
+  const browser = await puppeteer.launch({
+    headless: true,
+    args: [
+      '--disable-blink-features=AutomationControlled',
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+    ],
+  });
+
+  const page = await browser.newPage();
+  await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36');
+  await page.setViewport({ width: 1366, height: 768 });
+
+  const allProducts: ScrapedProduct[] = [];
+  const baseUrl = 'https://chicor.com/goods?dscatNo=1&hrchyLv=1';
+
+  try {
+    const pageUrl = baseUrl;
+    console.log(`🕵️ Scraping Chicor: ${pageUrl}`);
+
+    await page.goto(pageUrl, { waitUntil: 'networkidle2', timeout: 60000 });
     await new Promise((resolve) => setTimeout(resolve, 3000));
 
-    const products = await page.evaluate(() => {
+    const pageResult = await page.evaluate(() => {
       const results: ScrapedProduct[] = [];
       const debug = { foundContainers: 0, success: 0, noLink: 0 };
 
@@ -257,91 +320,11 @@ async function scrapeChicorPage(page: Page, url: string): Promise<ScrapedProduct
       return { products: results, debug };
     });
 
-    console.log(`DEBUG:`, products.debug);
-    console.log(`📦 Found ${products.products.length} items`);
-    return products.products;
-  } catch (error) {
-    console.error(`Error scraping:`, error);
-    return [];
-  }
-}
+    console.log(`DEBUG:`, pageResult.debug);
+    console.log(`📦 Found ${pageResult.products.length} items`);
+    allProducts.push(...pageResult.products);
+    console.log(`✅ Page 1/${effectivePages} done. Total: ${allProducts.length} products`);
 
-async function scrapeYesStyle(totalPages: number = 4): Promise<ScrapedProduct[]> {
-  console.log(`\n🚀 Starting YesStyle scraper (${totalPages} pages)...`);
-  const browser = await puppeteer.launch({ 
-    headless: true,
-    args: [
-      '--disable-blink-features=AutomationControlled',
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-    ],
-  });
-  
-  const page = await browser.newPage();
-  await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36');
-  await page.setViewport({ width: 1366, height: 768 });
-  const allProducts: ScrapedProduct[] = [];
-  const baseUrl = 'https://www.yesstyle.com/en/beauty-skin-care/list.html/bcc.15544_bpt.46';
-
-  try {
-    for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
-      const pageUrl = pageNum === 1 ? baseUrl : `${baseUrl}?pn=${pageNum}`;
-      
-      try {
-        const products = await scrapePage(page, pageUrl);
-        allProducts.push(...products);
-        console.log(`✅ Page ${pageNum}/${totalPages} done. Total: ${allProducts.length} products`);
-        
-        if (pageNum < totalPages) {
-          await new Promise(resolve => setTimeout(resolve, 2000));
-        }
-      } catch (pageError) {
-        console.error(`Error on page ${pageNum}:`, pageError);
-        continue;
-      }
-    }
-    return allProducts;
-  } finally {
-    await browser.close();
-  }
-}
-
-async function scrapeChicor(totalPages: number = 1): Promise<ScrapedProduct[]> {
-  console.log(`\n🚀 Starting Chicor scraper (${totalPages} pages)...`);
-  const browser = await puppeteer.launch({ 
-    headless: true,
-    args: [
-      '--disable-blink-features=AutomationControlled',
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-    ],
-  });
-  
-  const page = await browser.newPage();
-  await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36');
-  await page.setViewport({ width: 1366, height: 768 });
-
-  const allProducts: ScrapedProduct[] = [];
-  const baseUrl = 'https://chicor.com/goods?dscatNo=1&hrchyLv=1';
-
-  try {
-    for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
-      const pageUrl = baseUrl;
-      try {
-        if (pageNum > 1) break;
-        const products = await scrapeChicorPage(page, pageUrl);
-        allProducts.push(...products);
-        console.log(`✅ Page ${pageNum}/${totalPages} done. Total: ${allProducts.length} products`);
-        
-        if (pageNum < totalPages) {
-          await new Promise(resolve => setTimeout(resolve, 2000));
-        }
-      } catch (pageError) {
-        console.error(`Error on page ${pageNum}:`, pageError);
-        continue;
-      }
-    }
-    
     return allProducts;
   } finally {
     await browser.close();
@@ -350,24 +333,30 @@ async function scrapeChicor(totalPages: number = 1): Promise<ScrapedProduct[]> {
 
 (async () => {
   console.log(`\n${'='.repeat(60)}`);
-  console.log(`🚀 GLOSSY Scraper - Multi-store`);
+  console.log(`Scraper - Multi-store`);
   console.log(`${'='.repeat(60)}`);
-  
+
   const pagesToScrape = Math.max(1, Number.parseInt(process.env.PAGES_TO_SCRAPE || '4', 10) || 4);
-  
+
   try {
     const yesStyleProducts = await scrapeYesStyle(pagesToScrape);
-    const chicorProducts = await scrapeChicor(1);
-    const products = [...yesStyleProducts, ...chicorProducts];
-    
-    const cleanProducts = products.filter((p) => p.name && p.price > 0);
-    
+    const chicorProducts = await scrapeChicor(pagesToScrape);
+    const combinedProducts = [...yesStyleProducts, ...chicorProducts];
+
+    const cleanProducts = combinedProducts.filter((p) => p.name && p.price > 0);
+
     console.log(`\n${'='.repeat(60)}`);
     console.log(`📊 Summary: ${cleanProducts.length} valid products`);
     console.log(`${'='.repeat(60)}\n`);
-    
+
     await uploadToDB(cleanProducts);
   } catch (error) {
     console.error('❌ Fatal error:', error);
   }
 })().catch(console.error);
+
+
+
+//pageResult is from the main scraping function
+//pageProducts is from each page scrape
+//allProducts is the cumulative array
