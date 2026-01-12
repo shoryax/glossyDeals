@@ -22,9 +22,11 @@ export default function SearchBar({ onSearch }: Props) {
       <div className={`flex items-center gap-3 bg-white border-2 rounded-xl px-4 py-2.5 sm:py-3 smooth-transition ${
         isFocused ? 'border-fuchsia-400 shadow-lg' : 'border-gray-200 hover:border-gray-300'
       }`}>
+
         <Search className={`w-5 h-5 smooth-transition ${
           isFocused ? 'text-fuchsia-600' : 'text-gray-400'
         }`} strokeWidth={2} />
+
         <input
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
@@ -33,10 +35,11 @@ export default function SearchBar({ onSearch }: Props) {
           placeholder="Search for deals..."
           className="w-full bg-transparent text-sm sm:text-base text-gray-700 placeholder-gray-400 outline-none"
         />
+
         {searchTerm && (
           <button 
             type="submit" 
-            className="px-4 py-1.5 bg-gradient-to-r from-fuchsia-600 to-purple-600 text-white text-sm font-semibold rounded-lg hover:from-fuchsia-700 hover:to-purple-700 smooth-transition whitespace-nowrap"
+            className="px-4 py-1.5 bg-linear-to-r from-fuchsia-600 to-purple-600 text-white text-sm font-semibold rounded-lg hover:from-fuchsia-700 hover:to-purple-700 smooth-transition whitespace-nowrap"
           >
             Search
           </button>
