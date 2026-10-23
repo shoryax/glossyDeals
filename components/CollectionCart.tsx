@@ -32,8 +32,8 @@ export const CollectionCard = ({ collection, index = 0, variant = "default" }: C
           <Image
             src={collection.image}
             alt={collection.name}
-            fill
-            sizes="(max-width: 768px) 100vw, 50vw"
+            height={600}
+            width={600}
             className="w-full h-full object-cover transition-transform duration-[1.2s] ease-out group-hover:scale-110"
           />
 

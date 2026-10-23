@@ -16,6 +16,14 @@ export const ProductCard = ({ product, index = 0, variant = "default" }: Product
   const { addItem, removeItem, isInWishlist } = useWishlist();
   const inWishlist = isInWishlist(product.id);
   const hasSecondImage = product.images.length > 1;
+  const isIndianRupeeProduct =
+    product.retailer === "YesStyle" || product.retailer === "Chicor";
+  const formatPrice = (price: number) =>
+    new Intl.NumberFormat(isIndianRupeeProduct ? "en-IN" : "en-US", {
+      style: "currency",
+      currency: isIndianRupeeProduct ? "INR" : "USD",
+      maximumFractionDigits: 2,
+    }).format(price);
 
   const handleWishlistToggle = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -129,11 +137,11 @@ export const ProductCard = ({ product, index = 0, variant = "default" }: Product
 
           <div className="flex items-baseline gap-3 pt-1">
             <p className="text-base font-medium text-foreground tracking-wide">
-              ${product.price.toFixed(2)}
+              {formatPrice(product.price)}
             </p>
             {product.originalPrice && (
               <p className="text-sm text-muted-foreground/50 line-through">
-                ${product.originalPrice.toFixed(2)}
+                {formatPrice(product.originalPrice)}
               </p>
             )}
           </div>
